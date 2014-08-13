@@ -14,6 +14,7 @@ import qualified Data.Map as M
 newtype SDMonadT m a = SDMonad (StateT (M.Map String String) 
                                 (HarkerClientT m) a)
     deriving (Monad, MonadIO, Functor)
+type SDMonad a = SDMonadT IO a
 
 instance (Monad m) => MonadState (M.Map String String) (SDMonadT m) where
     get   = SDMonad $ get
@@ -23,23 +24,8 @@ instance (Monad m) => MonadState (M.Map String String) (SDMonadT m) where
 instance MonadTrans SDMonadT where
     lift = SDMonad . lift . lift
 
-instance (Functor m, Monad m, MonadIO m) 
-         => HarkerClientMonad (SDMonadT m) where
-    getSocket = SDMonad . lift $ getSocket
-    getHandle = SDMonad . lift $ getHandle
-    getIRCMsg = SDMonad . lift $ getIRCMsg
-    getUser   = SDMonad . lift $ getUser
-    getNick   = SDMonad . lift $ getNick
-    getChan   = SDMonad . lift $ getChan
-    getMMsg   = SDMonad . lift $ getMMsg
-    getMsg    = SDMonad . lift $ getMsg
-    getMAuth  = SDMonad . lift $ getMAuth
-    getAuth   = SDMonad . lift $ getAuth
-    setSocket = SDMonad . lift . setSocket
-    setHandle = SDMonad . lift . setHandle
-    setIRCMsg = SDMonad . lift . setIRCMsg
-
-type SDMonad a = SDMonadT IO a
+instance  HarkerClientMonad (SDMonadT IO) where
+    clientLift = SDMonad . lift
 
 runSDMonad :: SDMonad () -> IO ()
 runSDMonad (SDMonad s) = runHarkerClient (evalStateT s M.empty)
@@ -67,14 +53,11 @@ forget msg = let u = splitmsg msg
 
 checkDont :: SDMonad ()
 checkDont = do
-    mnick <- getNick
-    mchan <- getChan
-    case (mnick, mchan) of
-        (Just nick, Just chan) -> do
-            mrep <- gets (M.lookup nick)
-            case mrep of
-                -- bots name shoud be sent with in message
-                Just rep -> if chan == "harker" then sendReply rep
-                            else sendReply $ nick ++ ": " ++ rep
-                _        -> return ()
-        _                      -> return ()
+    nick <- getNick
+    chan <- getChan
+    mrep <- gets (M.lookup nick)
+    -- bots name shoud be sent with in message
+    case mrep of
+        Just rep -> if chan == "harker" then sendReply rep
+                    else sendReply $ nick ++ ": " ++ rep
+        _        -> return ()
