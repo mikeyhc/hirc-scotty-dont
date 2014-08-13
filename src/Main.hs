@@ -23,7 +23,8 @@ instance (Monad m) => MonadState (M.Map String String) (SDMonadT m) where
 instance MonadTrans SDMonadT where
     lift = SDMonad . lift . lift
 
-instance (Functor m, Monad m) => HarkerClientMonad (SDMonadT m) where
+instance (Functor m, Monad m, MonadIO m) 
+         => HarkerClientMonad (SDMonadT m) where
     getSocket = SDMonad . lift $ getSocket
     getHandle = SDMonad . lift $ getHandle
     getIRCMsg = SDMonad . lift $ getIRCMsg
@@ -48,21 +49,21 @@ main = runPlugin "scotty-dont" "0.1.0.0" scottyDont runSDMonad
 scottyDont :: SDMonad ()
 scottyDont = do
     msg   <- getMsg
-    auth  <- getAuth
-    umap  <- get
-    if "!dont " `isPrefixOf` msg then
-        if auth then let (u, r) = second tail . break (==' ') . tail
-                                $ dropWhile (/= ' ') msg
-                     in if null r then sendReply "no message provided"
-                                  else do
-                                      modify (M.insert u r)
-                                      sendReply "response stored"
-                else sendReply "you are not authenticated for that"
-    else if "!do " `isPrefixOf` msg then
-        if auth then let u = tail $ dropWhile (/= ' ') msg
-                     in  modify (M.delete u) >> sendReply (u ++ " forgotten")
-                else sendReply "you are not authenticated for that"
-    else checkDont
+    if "!dont " `isPrefixOf` msg    then ifauth (remember msg)
+    else if "!do " `isPrefixOf` msg then ifauth (forget msg)
+                                    else checkDont
+
+remember :: String -> SDMonad ()
+remember msg = let (u, r) = second tail . break (==' ') $ splitmsg msg
+                in if null r then sendReply "no message provided"
+                             else modify (M.insert u r) 
+                                   >> sendReply "response stored"
+
+splitmsg = tail . dropWhile(/= ' ')
+
+forget :: String -> SDMonad ()
+forget msg = let u = splitmsg msg
+             in  modify (M.delete u) >> sendReply (u ++ "forgotten")
 
 checkDont :: SDMonad ()
 checkDont = do
@@ -74,7 +75,6 @@ checkDont = do
             case mrep of
                 -- bots name shoud be sent with in message
                 Just rep -> if chan == "harker" then sendReply rep
-                                                else sendReply 
-                                                     $ nick ++ ": " ++ rep
+                            else sendReply $ nick ++ ": " ++ rep
                 _        -> return ()
         _                      -> return ()
