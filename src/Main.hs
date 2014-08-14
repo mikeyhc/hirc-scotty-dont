@@ -55,15 +55,15 @@ splitmsg = tail . dropWhile(/= ' ')
 
 forget :: String -> SDMonad ()
 forget msg = let u = splitmsg msg
-             in  modify (M.delete u) >> sendReply (u ++ "forgotten")
+             in  modify (M.delete u) >> sendReply (u ++ " forgotten")
 
 checkDont :: SDMonad ()
 checkDont = do
-    nick <- getNick
-    chan <- getChan
-    mrep <- gets (M.lookup nick)
-    -- bots name shoud be sent with in message
+    nick  <- getNick
+    mnick <- getMyNick
+    chan  <- getChan
+    mrep  <- gets (M.lookup nick)
     case mrep of
-        Just rep -> if chan == "harker" then sendReply rep
+        Just rep -> if chan == mnick then sendReply rep
                     else sendReply $ nick ++ ": " ++ rep
         _        -> return ()
