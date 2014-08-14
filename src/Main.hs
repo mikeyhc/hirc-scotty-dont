@@ -35,9 +35,15 @@ main = runPlugin "scotty-dont" "0.1.0.0" scottyDont runSDMonad
 scottyDont :: SDMonad ()
 scottyDont = do
     msg   <- getMsg
-    if "!dont " `isPrefixOf` msg    then ifauth (remember msg)
-    else if "!do " `isPrefixOf` msg then ifauth (forget msg)
-                                    else checkDont
+    if msg == "!help"                 then help
+    else if "!dont " `isPrefixOf` msg then ifauth (remember msg)
+    else if "!do " `isPrefixOf` msg   then ifauth (forget msg)
+                                      else checkDont
+
+help :: SDMonad ()
+help = sendReply "!dont user message: respond with message when user "
+    >> sendReply "                    talks"
+    >> sendReply "!do user:           remove the rule about user"
 
 remember :: String -> SDMonad ()
 remember msg = let (u, r) = second tail . break (==' ') $ splitmsg msg
